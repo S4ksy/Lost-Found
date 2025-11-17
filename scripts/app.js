@@ -228,15 +228,21 @@ class LostFoundApp {
             return;
         }
 
+        // Basic validation
+        if (!itemName.value.trim() || !description.value.trim() || !location.value.trim()) {
+            this.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
         const itemData = {
             id: database.generateId(),
             userId: user.id,
             userName: user.name,
-            itemName: itemName.value,
+            itemName: itemName.value.trim(),
             category: category.value,
-            description: description.value,
+            description: description.value.trim(),
             dateTime: dateTime.value,
-            location: location.value,
+            location: location.value.trim(),
             status: 'lost',
             createdAt: new Date().toISOString()
         };
@@ -283,15 +289,21 @@ class LostFoundApp {
             return;
         }
 
+        // Basic validation
+        if (!itemName.value.trim() || !description.value.trim() || !location.value.trim()) {
+            this.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
         const itemData = {
             id: database.generateId(),
             foundBy: user.name,
             foundByUserId: user.id,
-            itemName: itemName.value,
+            itemName: itemName.value.trim(),
             category: category.value,
-            description: description.value,
+            description: description.value.trim(),
             dateTime: dateTime.value,
-            location: location.value,
+            location: location.value.trim(),
             status: 'available',
             createdAt: new Date().toISOString()
         };
@@ -303,6 +315,8 @@ class LostFoundApp {
                 itemData.photo = await database.saveImage(photoFile);
             } catch (error) {
                 console.error('Error uploading image:', error);
+                this.showNotification('Error uploading photo. Please try again.', 'error');
+                return;
             }
         } else {
             this.showNotification('Please upload a photo of the found item', 'error');
@@ -311,10 +325,13 @@ class LostFoundApp {
 
         database.saveFoundItem(itemData);
         
-        this.showNotification('Found item reported successfully!');
+        this.showNotification('Found item reported successfully! It is now available for claiming in the catalog.');
         e.target.reset();
         this.hideImagePreview('foundPhotoPreview');
         this.loadStats();
+        
+        // Switch to Found Items Catalog to see the new item
+        this.showTab('foundCatalog');
     }
 
     hideImagePreview(previewId) {
@@ -345,6 +362,7 @@ class LostFoundApp {
 
         if (items.length === 0) {
             if (noItems) noItems.classList.remove('hidden');
+            console.log('No found items available');
             return;
         }
 
@@ -373,12 +391,13 @@ class LostFoundApp {
                 <h3 class="item-name">${item.itemName}</h3>
                 <p class="item-description">${item.description}</p>
                 <div class="item-meta">
+                    <span><i class="fas fa-user"></i> Found by: ${item.foundBy}</span>
                     <span><i class="fas fa-map-marker-alt"></i> ${item.location}</span>
                     <span><i class="fas fa-calendar"></i> ${new Date(item.dateTime).toLocaleDateString()}</span>
                 </div>
                 <div class="item-actions">
                     <button class="btn btn-primary btn-sm claim-btn" data-item-id="${item.id}">
-                        <i class="fas fa-hand-holding"></i> Claim Item
+                        <i class="fas fa-hand-holding"></i> Claim This Item
                     </button>
                 </div>
             </div>
@@ -404,11 +423,14 @@ class LostFoundApp {
         }
 
         preview.innerHTML = `
-            <h4>${item.itemName}</h4>
-            <p><strong>Category:</strong> ${item.category}</p>
-            <p><strong>Found At:</strong> ${item.location}</p>
-            <p><strong>Description:</strong> ${item.description}</p>
-            ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" style="max-width: 200px; margin-top: 10px;" />` : ''}
+            <div style="text-align: center;">
+                <h4>Claim: ${item.itemName}</h4>
+                <p><strong>Category:</strong> ${item.category}</p>
+                <p><strong>Found At:</strong> ${item.location}</p>
+                <p><strong>Found On:</strong> ${new Date(item.dateTime).toLocaleDateString()}</p>
+                <p><strong>Description:</strong> ${item.description}</p>
+                ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" style="max-width: 200px; margin-top: 10px; border-radius: 5px;" />` : ''}
+            </div>
         `;
 
         modal.classList.remove('hidden');
@@ -444,7 +466,7 @@ class LostFoundApp {
         const user = auth.getCurrentUser();
         const proofDescription = document.getElementById('proofDescription');
 
-        if (!proofDescription || !proofDescription.value) {
+        if (!proofDescription || !proofDescription.value.trim()) {
             this.showNotification('Please provide proof of ownership', 'error');
             return;
         }
@@ -455,7 +477,9 @@ class LostFoundApp {
             userName: user.name,
             itemId: this.currentClaimItem.id,
             itemName: this.currentClaimItem.itemName,
-            proofDescription: proofDescription.value,
+            itemCategory: this.currentClaimItem.category,
+            foundBy: this.currentClaimItem.foundBy,
+            proofDescription: proofDescription.value.trim(),
             status: 'pending',
             createdAt: new Date().toISOString()
         };
@@ -475,6 +499,9 @@ class LostFoundApp {
         this.showNotification('Claim submitted successfully! It will be reviewed by an administrator.');
         this.hideClaimModal();
         this.loadStats();
+        
+        // Switch to My Claims tab
+        this.showTab('myClaims');
     }
 
     loadMyLostItems() {
@@ -508,7 +535,7 @@ class LostFoundApp {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-            <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                 <h3 style="margin: 0; flex: 1;">${item.itemName}</h3>
                 <span class="item-category">${item.category}</span>
             </div>
@@ -520,6 +547,7 @@ class LostFoundApp {
             <div class="item-status" style="margin-top: 10px;">
                 <span class="status-badge status-pending">Searching</span>
             </div>
+            ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" style="max-width: 200px; margin-top: 10px; border-radius: 5px;" />` : ''}
         `;
         return card;
     }
@@ -558,15 +586,17 @@ class LostFoundApp {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-            <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                 <h3 style="margin: 0; flex: 1;">${claim.itemName}</h3>
                 <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
+            <p><strong>Category:</strong> ${claim.itemCategory}</p>
+            <p><strong>Found By:</strong> ${claim.foundBy}</p>
             <p><strong>Proof Description:</strong> ${claim.proofDescription}</p>
             <div class="item-meta">
                 <span><i class="fas fa-calendar"></i> Submitted: ${new Date(claim.createdAt).toLocaleString()}</span>
             </div>
-            ${claim.proofPhoto ? `<img src="${claim.proofPhoto}" alt="Proof" style="max-width: 200px; margin-top: 10px;" />` : ''}
+            ${claim.proofPhoto ? `<img src="${claim.proofPhoto}" alt="Proof" style="max-width: 200px; margin-top: 10px; border-radius: 5px;" />` : ''}
         `;
         return card;
     }
@@ -617,6 +647,46 @@ class LostFoundApp {
             alert(`${type.toUpperCase()}: ${message}`);
         }
     }
+
+    // Add sample data for testing
+    addSampleFoundItems() {
+        if (!auth || !auth.getCurrentUser()) return;
+
+        const user = auth.getCurrentUser();
+        const sampleItems = [
+            {
+                id: database.generateId(),
+                foundBy: user.name,
+                foundByUserId: user.id,
+                itemName: "Black Wireless Earbuds",
+                category: "Electronics",
+                description: "Black wireless earbuds in a charging case. Left earbud has a small scratch.",
+                dateTime: new Date().toISOString(),
+                location: "Library - Study Room 2",
+                status: "available",
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: database.generateId(),
+                foundBy: user.name,
+                foundByUserId: user.id,
+                itemName: "Blue Water Bottle",
+                category: "Accessories",
+                description: "Blue Hydro Flask water bottle with stickers. 32oz capacity.",
+                dateTime: new Date().toISOString(),
+                location: "Student Center Cafeteria",
+                status: "available",
+                createdAt: new Date().toISOString()
+            }
+        ];
+
+        sampleItems.forEach(item => {
+            database.saveFoundItem(item);
+        });
+
+        this.showNotification('Sample found items added for testing!');
+        this.loadFoundItems();
+    }
 }
 
 // Initialize the app when everything is ready
@@ -629,10 +699,37 @@ function initializeApp() {
             console.log('User is logged in, initializing app...');
             window.app = new LostFoundApp();
             window.app.init();
+            
+            // Add debug button to add sample data
+            addDebugButton();
         } else {
             console.log('User not logged in, app will initialize after login');
         }
     }, 100);
+}
+
+// Add debug button for testing
+function addDebugButton() {
+    const debugBtn = document.createElement('button');
+    debugBtn.textContent = 'Add Sample Found Items (Debug)';
+    debugBtn.style.position = 'fixed';
+    debugBtn.style.bottom = '10px';
+    debugBtn.style.right = '10px';
+    debugBtn.style.zIndex = '1000';
+    debugBtn.style.padding = '10px';
+    debugBtn.style.background = '#ff4444';
+    debugBtn.style.color = 'white';
+    debugBtn.style.border = 'none';
+    debugBtn.style.borderRadius = '5px';
+    debugBtn.style.cursor = 'pointer';
+    
+    debugBtn.addEventListener('click', () => {
+        if (window.app && window.app.addSampleFoundItems) {
+            window.app.addSampleFoundItems();
+        }
+    });
+    
+    document.body.appendChild(debugBtn);
 }
 
 // Start initialization when DOM is loaded
