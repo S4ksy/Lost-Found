@@ -1,722 +1,616 @@
-// Data storage (in a real app, this would be a database)
-let lostItems = JSON.parse(localStorage.getItem('lostItems')) || [];
-let foundItems = JSON.parse(localStorage.getItem('foundItems')) || [];
-let claimRequests = JSON.parse(localStorage.getItem('claimRequests')) || [];
-
-// App state
-let currentUserRole = 'user'; // 'user' or 'admin'
-let selectedItemForClaim = null;
-let searchTerm = '';
-let filterCategory = 'all';
-
-// DOM Elements
-const viewToggle = document.getElementById('viewToggle');
-const navTabs = document.querySelectorAll('.nav-tab');
-const tabContents = document.querySelectorAll('.tab-content');
-const adminOnlyElements = document.querySelectorAll('.admin-only');
-
-// Form elements
-const lostItemForm = document.getElementById('lostItemForm');
-const foundItemForm = document.getElementById('foundItemForm');
-const claimForm = document.getElementById('claimForm');
-
-// File upload elements
-const lostPhotoUpload = document.getElementById('lostPhotoUpload');
-const lostPhoto = document.getElementById('lostPhoto');
-const lostPhotoPreview = document.getElementById('lostPhotoPreview');
-const lostPhotoPreviewImg = document.getElementById('lostPhotoPreviewImg');
-
-const foundPhotoUpload = document.getElementById('foundPhotoUpload');
-const foundPhoto = document.getElementById('foundPhoto');
-const foundPhotoPreview = document.getElementById('foundPhotoPreview');
-const foundPhotoPreviewImg = document.getElementById('foundPhotoPreviewImg');
-
-const claimProofUpload = document.getElementById('claimProofUpload');
-const claimProof = document.getElementById('claimProof');
-const claimProofPreview = document.getElementById('claimProofPreview');
-const claimProofPreviewImg = document.getElementById('claimProofPreviewImg');
-
-// Modal elements
-const claimModal = document.getElementById('claimModal');
-const closeClaimModal = document.getElementById('closeClaimModal');
-const cancelClaim = document.getElementById('cancelClaim');
-const claimItemPreview = document.getElementById('claimItemPreview');
-
-// Notification elements
-const notification = document.getElementById('notification');
-const notificationMessage = document.getElementById('notificationMessage');
-
-// Search and filter elements
-const searchItems = document.getElementById('searchItems');
-const filterCategorySelect = document.getElementById('filterCategory');
-
-// Stats elements
-const lostItemsCount = document.getElementById('lostItemsCount');
-const foundItemsCount = document.getElementById('foundItemsCount');
-const claimsCount = document.getElementById('claimsCount');
-
-// Initialize the app
-document.addEventListener('DOMContentLoaded', function() {
-    initializeEventListeners();
-    updateStats();
-    renderFoundItems();
-    renderLostItems();
-    renderClaims();
-    renderAdminClaims();
-});
-
-// Event Listeners
-function initializeEventListeners() {
-    // Navigation
-    navTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabId = tab.getAttribute('data-tab');
-            switchTab(tabId);
-        });
-    });
-    
-    // Action cards on home page
-    document.querySelectorAll('.action-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const tabId = card.getAttribute('data-tab');
-            switchTab(tabId);
-        });
-    });
-    
-    // View toggle
-    viewToggle.addEventListener('click', toggleUserRole);
-    
-    // Form submissions
-    lostItemForm.addEventListener('submit', handleLostItemSubmit);
-    foundItemForm.addEventListener('submit', handleFoundItemSubmit);
-    claimForm.addEventListener('submit', handleClaimSubmit);
-    
-    // File uploads
-    lostPhotoUpload.addEventListener('click', () => lostPhoto.click());
-    lostPhoto.addEventListener('change', (e) => handleImageUpload(e, 'lost'));
-    
-    foundPhotoUpload.addEventListener('click', () => foundPhoto.click());
-    foundPhoto.addEventListener('change', (e) => handleImageUpload(e, 'found'));
-    
-    claimProofUpload.addEventListener('click', () => claimProof.click());
-    claimProof.addEventListener('change', (e) => handleImageUpload(e, 'claim'));
-    
-    // Modal controls
-    closeClaimModal.addEventListener('click', closeModal);
-    cancelClaim.addEventListener('click', closeModal);
-    
-    // Search and filter
-    searchItems.addEventListener('input', handleSearch);
-    filterCategorySelect.addEventListener('change', handleFilter);
-    
-    // Empty state buttons
-    document.querySelectorAll('.empty-state .btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tabId = e.target.getAttribute('data-tab');
-            if (tabId) switchTab(tabId);
-        });
-    });
-}
-
-// Tab Navigation
-function switchTab(tabId) {
-    // Update active tab
-    navTabs.forEach(tab => {
-        if (tab.getAttribute('data-tab') === tabId) {
-            tab.classList.add('active');
-        } else {
-            tab.classList.remove('active');
-        }
-    });
-    
-    // Show selected tab content
-    tabContents.forEach(content => {
-        if (content.id === tabId) {
-            content.classList.remove('hidden');
-        } else {
-            content.classList.add('hidden');
-        }
-    });
-    
-    // Special handling for certain tabs
-    if (tabId === 'foundCatalog') {
-        renderFoundItems();
-    } else if (tabId === 'myLostItems') {
-        renderLostItems();
-    } else if (tabId === 'myClaims') {
-        renderClaims();
-    } else if (tabId === 'adminClaims') {
-        renderAdminClaims();
+class LostFoundApp {
+    constructor() {
+        this.currentTab = 'home';
+        this.currentClaimItem = null;
     }
-}
 
-// User Role Toggle
-function toggleUserRole() {
-    currentUserRole = currentUserRole === 'user' ? 'admin' : 'user';
-    viewToggle.textContent = currentUserRole === 'user' ? 'Admin View' : 'User View';
-    
-    // Show/hide admin-only elements
-    adminOnlyElements.forEach(element => {
-        if (currentUserRole === 'admin') {
-            element.classList.remove('hidden');
-        } else {
-            element.classList.add('hidden');
-        }
-    });
-    
-    // If on admin claims tab and switching to user, go to home
-    const activeTab = document.querySelector('.nav-tab.active').getAttribute('data-tab');
-    if (currentUserRole === 'user' && activeTab === 'adminClaims') {
-        switchTab('home');
+    init() {
+        this.bindEvents();
+        this.loadStats();
+        this.showTab('home');
     }
-}
 
-// Form Handlers
-function handleLostItemSubmit(e) {
-    e.preventDefault();
-    
-    const newItem = {
-        id: Date.now(),
-        itemName: document.getElementById('lostItemName').value,
-        category: document.getElementById('lostCategory').value,
-        description: document.getElementById('lostDescription').value,
-        dateTime: document.getElementById('lostDateTime').value,
-        location: document.getElementById('lostLocation').value,
-        photo: lostPhotoPreviewImg.src || null,
-        ownerName: document.getElementById('lostOwnerName').value,
-        contactEmail: document.getElementById('lostContactEmail').value,
-        contactPhone: document.getElementById('lostContactPhone').value,
-        status: 'Pending',
-        dateSubmitted: new Date().toISOString(),
-        potentialMatches: []
-    };
-    
-    lostItems.push(newItem);
-    saveToLocalStorage();
-    updateStats();
-    showNotification('Lost item reported successfully!');
-    
-    // Reset form
-    lostItemForm.reset();
-    lostPhotoPreview.classList.add('hidden');
-    
-    // Switch to my lost items tab
-    switchTab('myLostItems');
-}
-
-function handleFoundItemSubmit(e) {
-    e.preventDefault();
-    
-    const newItem = {
-        id: Date.now(),
-        itemName: document.getElementById('foundItemName').value,
-        category: document.getElementById('foundCategory').value,
-        description: document.getElementById('foundDescription').value,
-        dateTime: document.getElementById('foundDateTime').value,
-        location: document.getElementById('foundLocation').value,
-        photo: foundPhotoPreviewImg.src || null,
-        finderName: document.getElementById('finderName').value,
-        contactInfo: document.getElementById('finderContact').value,
-        status: 'Available',
-        dateSubmitted: new Date().toISOString(),
-        claimStatus: 'Unclaimed'
-    };
-    
-    foundItems.push(newItem);
-    saveToLocalStorage();
-    updateStats();
-    showNotification('Found item registered successfully!');
-    
-    // Reset form
-    foundItemForm.reset();
-    foundPhotoPreview.classList.add('hidden');
-    
-    // Switch to found catalog tab
-    switchTab('foundCatalog');
-}
-
-function handleClaimSubmit(e) {
-    e.preventDefault();
-    
-    const newClaim = {
-        id: Date.now(),
-        itemId: selectedItemForClaim.id,
-        claimerName: document.getElementById('claimerName').value,
-        claimerEmail: document.getElementById('claimerEmail').value,
-        claimerPhone: document.getElementById('claimerPhone').value,
-        proofDescription: document.getElementById('proofDescription').value,
-        proofPhoto: claimProofPreviewImg.src || null,
-        itemDetails: selectedItemForClaim,
-        status: 'Pending',
-        dateSubmitted: new Date().toISOString()
-    };
-    
-    claimRequests.push(newClaim);
-    
-    // Update found item status
-    const foundItemIndex = foundItems.findIndex(item => item.id === selectedItemForClaim.id);
-    if (foundItemIndex !== -1) {
-        foundItems[foundItemIndex].claimStatus = 'Claim Pending';
-    }
-    
-    saveToLocalStorage();
-    updateStats();
-    showNotification('Claim request submitted successfully!');
-    closeModal();
-    
-    // Switch to my claims tab
-    switchTab('myClaims');
-}
-
-// Image Upload Handler
-function handleImageUpload(e, type) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            if (type === 'lost') {
-                lostPhotoPreviewImg.src = event.target.result;
-                lostPhotoPreview.classList.remove('hidden');
-            } else if (type === 'found') {
-                foundPhotoPreviewImg.src = event.target.result;
-                foundPhotoPreview.classList.remove('hidden');
-            } else if (type === 'claim') {
-                claimProofPreviewImg.src = event.target.result;
-                claimProofPreview.classList.remove('hidden');
-            }
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-// Search and Filter Handlers
-function handleSearch(e) {
-    searchTerm = e.target.value.toLowerCase();
-    renderFoundItems();
-}
-
-function handleFilter(e) {
-    filterCategory = e.target.value;
-    renderFoundItems();
-}
-
-// Modal Functions
-function openClaimModal(item) {
-    selectedItemForClaim = item;
-    
-    // Populate item preview
-    claimItemPreview.innerHTML = `
-        <div class="item-preview-content">
-            ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" class="item-preview-image">` : ''}
-            <div class="item-preview-details">
-                <h4>${item.itemName}</h4>
-                <p>${item.description}</p>
-                <p class="location">Found at: ${item.location}</p>
-            </div>
-        </div>
-    `;
-    
-    // Reset form
-    claimForm.reset();
-    claimProofPreview.classList.add('hidden');
-    
-    // Show modal
-    claimModal.classList.remove('hidden');
-}
-
-function closeModal() {
-    claimModal.classList.add('hidden');
-    selectedItemForClaim = null;
-}
-
-// Notification Function
-function showNotification(message) {
-    notificationMessage.textContent = message;
-    notification.classList.remove('hidden');
-    
-    setTimeout(() => {
-        notification.classList.add('hidden');
-    }, 3000);
-}
-
-// Rendering Functions
-function renderFoundItems() {
-    const foundItemsGrid = document.getElementById('foundItemsGrid');
-    const noFoundItems = document.getElementById('noFoundItems');
-    
-    // Filter items
-    const filteredItems = foundItems.filter(item => {
-        const matchesSearch = item.itemName.toLowerCase().includes(searchTerm) ||
-                             item.description.toLowerCase().includes(searchTerm);
-        const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
-        return matchesSearch && matchesCategory && item.claimStatus !== 'Claimed';
-    });
-    
-    if (filteredItems.length === 0) {
-        foundItemsGrid.innerHTML = '';
-        noFoundItems.classList.remove('hidden');
-        return;
-    }
-    
-    noFoundItems.classList.add('hidden');
-    
-    // Render items
-    foundItemsGrid.innerHTML = filteredItems.map(item => `
-        <div class="item-card">
-            ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" class="item-image">` : ''}
-            <div class="item-content">
-                <div class="item-header">
-                    <div class="item-name">${item.itemName}</div>
-                    <div class="item-status ${item.claimStatus === 'Unclaimed' ? 'status-unclaimed' : 'status-pending'}">
-                        ${item.claimStatus}
-                    </div>
-                </div>
-                <p class="item-description">${item.description}</p>
-                <div class="item-details">
-                    <div class="item-detail">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>${item.location}</span>
-                    </div>
-                    <div class="item-detail">
-                        <i class="fas fa-calendar"></i>
-                        <span>${new Date(item.dateTime).toLocaleDateString()}</span>
-                    </div>
-                    <div class="item-detail">
-                        <i class="fas fa-file-alt"></i>
-                        <span>${item.category}</span>
-                    </div>
-                </div>
-                ${item.claimStatus === 'Unclaimed' ? 
-                    `<button class="btn btn-primary" onclick="openClaimModal(${JSON.stringify(item).replace(/"/g, '&quot;')})">Claim This Item</button>` : 
-                    `<button class="btn btn-secondary" disabled>Claim Pending</button>`
-                }
-            </div>
-        </div>
-    `).join('');
-}
-
-function renderLostItems() {
-    const lostItemsList = document.getElementById('lostItemsList');
-    const noLostItems = document.getElementById('noLostItems');
-    
-    if (lostItems.length === 0) {
-        lostItemsList.innerHTML = '';
-        noLostItems.classList.remove('hidden');
-        return;
-    }
-    
-    noLostItems.classList.add('hidden');
-    
-    lostItemsList.innerHTML = lostItems.map(item => `
-        <div class="card">
-            <div class="item-details-layout">
-                ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" class="item-image-small">` : ''}
-                <div class="item-details-content">
-                    <div class="item-header">
-                        <div>
-                            <h3 class="item-name">${item.itemName}</h3>
-                            <p class="item-category">Category: ${item.category}</p>
-                        </div>
-                        <span class="status-badge ${getStatusClass(item.status)}">${item.status}</span>
-                    </div>
-                    <p class="item-description">${item.description}</p>
-                    <div class="item-meta">
-                        <div class="item-meta-item">
-                            <i class="fas fa-map-marker-alt"></i>
-                            <span>Lost at: ${item.location}</span>
-                        </div>
-                        <div class="item-meta-item">
-                            <i class="fas fa-calendar"></i>
-                            <span>${new Date(item.dateTime).toLocaleString()}</span>
-                        </div>
-                        <div class="item-meta-item">
-                            <i class="fas fa-user"></i>
-                            <span>${item.ownerName}</span>
-                        </div>
-                        <div class="item-meta-item">
-                            <i class="fas fa-clock"></i>
-                            <span>Reported: ${new Date(item.dateSubmitted).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                    ${item.potentialMatches && item.potentialMatches.length > 0 ? `
-                        <div class="alert alert-info">
-                            <p><strong>🎯 ${item.potentialMatches.length} Potential Match(es) Found!</strong></p>
-                            <p>Check the Found Items Catalog to see if any of these items are yours.</p>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function renderClaims() {
-    const claimsList = document.getElementById('claimsList');
-    const noClaims = document.getElementById('noClaims');
-    
-    if (claimRequests.length === 0) {
-        claimsList.innerHTML = '';
-        noClaims.classList.remove('hidden');
-        return;
-    }
-    
-    noClaims.classList.add('hidden');
-    
-    claimsList.innerHTML = claimRequests.map(claim => `
-        <div class="card">
-            <div class="claim-header">
-                <div>
-                    <h3 class="item-name">${claim.itemDetails.itemName}</h3>
-                    <p class="claim-id">Claim ID: #${claim.id}</p>
-                </div>
-                <span class="status-badge ${getStatusClass(claim.status)}">${claim.status}</span>
-            </div>
-            
-            <div class="claim-details">
-                <div class="claim-section">
-                    <h4>Item Details</h4>
-                    ${claim.itemDetails.photo ? `<img src="${claim.itemDetails.photo}" alt="${claim.itemDetails.itemName}" class="item-image-small">` : ''}
-                    <p class="item-description">${claim.itemDetails.description}</p>
-                    <div class="claim-info">
-                        <div class="claim-info-item">
-                            <i class="fas fa-map-marker-alt"></i>
-                            <span>Found at: ${claim.itemDetails.location}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-calendar"></i>
-                            <span>${new Date(claim.itemDetails.dateTime).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="claim-section">
-                    <h4>Your Claim Information</h4>
-                    <div class="claim-info">
-                        <div class="claim-info-item">
-                            <i class="fas fa-user"></i>
-                            <span>Name: ${claim.claimerName}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-envelope"></i>
-                            <span>Email: ${claim.claimerEmail}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-phone"></i>
-                            <span>Phone: ${claim.claimerPhone}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-file-alt"></i>
-                            <span>Proof: ${claim.proofDescription}</span>
-                        </div>
-                        ${claim.proofPhoto ? `
-                            <div class="claim-info-item">
-                                <i class="fas fa-image"></i>
-                                <span>Proof Photo: <img src="${claim.proofPhoto}" alt="Proof" class="image-preview-small"></span>
-                            </div>
-                        ` : ''}
-                        <div class="claim-info-item">
-                            <i class="fas fa-clock"></i>
-                            <span>Submitted: ${new Date(claim.dateSubmitted).toLocaleString()}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            ${claim.status === 'Approved' ? `
-                <div class="alert alert-success">
-                    ✓ Your claim has been approved! Please proceed to the Lost & Found office to pick up your item.
-                </div>
-            ` : ''}
-            
-            ${claim.status === 'Rejected' ? `
-                <div class="alert alert-error">
-                    ✗ Your claim was not approved. Please contact the office for more details.
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-}
-
-function renderAdminClaims() {
-    const adminClaimsList = document.getElementById('adminClaimsList');
-    const noAdminClaims = document.getElementById('noAdminClaims');
-    
-    if (claimRequests.length === 0) {
-        adminClaimsList.innerHTML = '';
-        noAdminClaims.classList.remove('hidden');
-        return;
-    }
-    
-    noAdminClaims.classList.add('hidden');
-    
-    adminClaimsList.innerHTML = claimRequests.map(claim => `
-        <div class="card">
-            <div class="claim-header">
-                <div>
-                    <h3 class="item-name">${claim.itemDetails.itemName}</h3>
-                    <p class="claim-id">Claim ID: #${claim.id}</p>
-                </div>
-                <span class="status-badge ${getStatusClass(claim.status)}">${claim.status}</span>
-            </div>
-
-            <div class="claim-details">
-                <div class="claim-section">
-                    <h4>Found Item</h4>
-                    ${claim.itemDetails.photo ? `<img src="${claim.itemDetails.photo}" alt="${claim.itemDetails.itemName}" class="item-image-small">` : ''}
-                    <p class="item-description">${claim.itemDetails.description}</p>
-                    <div class="claim-info">
-                        <div class="claim-info-item">
-                            <span>Category: ${claim.itemDetails.category}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <span>Found at: ${claim.itemDetails.location}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <span>Date: ${new Date(claim.itemDetails.dateTime).toLocaleDateString()}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <span>Finder: ${claim.itemDetails.finderName}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="claim-section">
-                    <h4>Claimer Info</h4>
-                    <div class="claim-info">
-                        <div class="claim-info-item">
-                            <i class="fas fa-user"></i>
-                            <span>${claim.claimerName}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-envelope"></i>
-                            <span>${claim.claimerEmail}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-phone"></i>
-                            <span>${claim.claimerPhone}</span>
-                        </div>
-                        <div class="claim-info-item">
-                            <i class="fas fa-clock"></i>
-                            <span>${new Date(claim.dateSubmitted).toLocaleString()}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="claim-section">
-                    <h4>Proof of Ownership</h4>
-                    <p class="item-description">${claim.proofDescription}</p>
-                    ${claim.proofPhoto ? `<img src="${claim.proofPhoto}" alt="Proof" class="item-image-small">` : ''}
-                </div>
-            </div>
-
-            ${claim.status === 'Pending' ? `
-                <div class="admin-actions">
-                    <button class="btn btn-success" onclick="updateClaimStatus(${claim.id}, 'Approved')">
-                        <i class="fas fa-check-circle"></i> Approve Claim
-                    </button>
-                    <button class="btn btn-warning" onclick="updateClaimStatus(${claim.id}, 'For Verification')">
-                        Request More Info
-                    </button>
-                    <button class="btn btn-danger" onclick="updateClaimStatus(${claim.id}, 'Rejected')">
-                        <i class="fas fa-times"></i> Reject Claim
-                    </button>
-                </div>
-            ` : ''}
-
-            ${claim.status === 'Approved' ? `
-                <div class="admin-actions">
-                    <button class="btn btn-primary" onclick="updateClaimStatus(${claim.id}, 'Picked Up')">
-                        Mark as Picked Up
-                    </button>
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-}
-
-// Helper Functions
-function getStatusClass(status) {
-    switch (status) {
-        case 'Pending': return 'status-pending';
-        case 'Matched': return 'status-matched';
-        case 'Returned': return 'status-returned';
-        case 'Approved': return 'status-approved';
-        case 'Rejected': return 'status-rejected';
-        case 'Closed': return 'status-closed';
-        case 'For Verification': return 'status-pending';
-        case 'Picked Up': return 'status-returned';
-        default: return 'status-pending';
-    }
-}
-
-function updateClaimStatus(claimId, newStatus) {
-    const claimIndex = claimRequests.findIndex(claim => claim.id === claimId);
-    if (claimIndex !== -1) {
-        claimRequests[claimIndex].status = newStatus;
-        
-        // Update found item status if needed
-        const claim = claimRequests[claimIndex];
-        if (claim) {
-            const foundItemIndex = foundItems.findIndex(item => item.id === claim.itemId);
-            if (foundItemIndex !== -1) {
-                if (newStatus === 'Approved') {
-                    foundItems[foundItemIndex].claimStatus = 'Claimed';
-                    foundItems[foundItemIndex].status = 'Released';
-                } else if (newStatus === 'Rejected') {
-                    foundItems[foundItemIndex].claimStatus = 'Unclaimed';
-                } else if (newStatus === 'Picked Up') {
-                    foundItems[foundItemIndex].claimStatus = 'Claimed';
-                    foundItems[foundItemIndex].status = 'Picked Up';
-                }
-            }
-        }
-        
-        saveToLocalStorage();
-        updateStats();
-        showNotification(`Claim ${newStatus.toLowerCase()} successfully!`);
-        renderAdminClaims();
-        renderClaims();
-        renderFoundItems();
-    }
-}
-
-function updateStats() {
-    lostItemsCount.textContent = lostItems.length;
-    foundItemsCount.textContent = foundItems.filter(item => item.claimStatus === 'Unclaimed').length;
-    claimsCount.textContent = claimRequests.filter(claim => claim.status === 'Pending').length;
-}
-
-function saveToLocalStorage() {
-    localStorage.setItem('lostItems', JSON.stringify(lostItems));
-    localStorage.setItem('foundItems', JSON.stringify(foundItems));
-    localStorage.setItem('claimRequests', JSON.stringify(claimRequests));
-}
-
-// Auto-match items periodically
-setInterval(() => {
-    lostItems.forEach(lostItem => {
-        if (lostItem.status !== 'Matched' && lostItem.status !== 'Returned') {
-            const matches = foundItems.filter(foundItem => {
-                const nameMatch = foundItem.itemName.toLowerCase().includes(lostItem.itemName.toLowerCase()) ||
-                                 lostItem.itemName.toLowerCase().includes(foundItem.itemName.toLowerCase());
-                const categoryMatch = foundItem.category === lostItem.category;
-                const locationMatch = foundItem.location.toLowerCase().includes(lostItem.location.toLowerCase()) ||
-                                     lostItem.location.toLowerCase().includes(foundItem.location.toLowerCase());
-                
-                return (nameMatch && categoryMatch) || (nameMatch && locationMatch) || (categoryMatch && locationMatch);
+    bindEvents() {
+        // Navigation tabs
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const tabName = e.target.dataset.tab;
+                this.showTab(tabName);
             });
+        });
 
-            if (matches.length > 0 && lostItem.potentialMatches.length === 0) {
-                lostItem.potentialMatches = matches.map(m => m.id);
-                lostItem.status = 'Matched';
-                showNotification(`Potential match found for your lost ${lostItem.itemName}!`);
-                saveToLocalStorage();
-                renderLostItems();
-            }
+        // Action cards on home page
+        document.querySelectorAll('.action-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const tabName = e.currentTarget.dataset.tab;
+                this.showTab(tabName);
+            });
+        });
+
+        // Form submissions
+        document.getElementById('lostItemForm').addEventListener('submit', (e) => this.handleLostItemSubmit(e));
+        document.getElementById('foundItemForm').addEventListener('submit', (e) => this.handleFoundItemSubmit(e));
+        document.getElementById('claimForm').addEventListener('submit', (e) => this.handleClaimSubmit(e));
+
+        // File uploads
+        this.setupFileUpload('lostPhoto', 'lostPhotoUpload', 'lostPhotoPreview', 'lostPhotoPreviewImg');
+        this.setupFileUpload('foundPhoto', 'foundPhotoUpload', 'foundPhotoPreview', 'foundPhotoPreviewImg');
+        this.setupFileUpload('claimProof', 'claimProofUpload', 'claimProofPreview', 'claimProofPreviewImg');
+
+        // Search and filter
+        const searchInput = document.getElementById('searchItems');
+        const filterSelect = document.getElementById('filterCategory');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', () => this.filterFoundItems());
         }
-    });
-}, 10000); // Check every 10 seconds
+        if (filterSelect) {
+            filterSelect.addEventListener('change', () => this.filterFoundItems());
+        }
 
-// Make functions available globally for onclick handlers
-window.openClaimModal = openClaimModal;
-window.updateClaimStatus = updateClaimStatus;
+        // Claim modal
+        document.getElementById('closeClaimModal').addEventListener('click', () => this.hideClaimModal());
+        document.getElementById('cancelClaim').addEventListener('click', () => this.hideClaimModal());
+        
+        const claimModal = document.getElementById('claimModal');
+        if (claimModal) {
+            claimModal.addEventListener('click', (e) => {
+                if (e.target.id === 'claimModal') {
+                    this.hideClaimModal();
+                }
+            });
+        }
+
+        // Empty state buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.dataset.tab) {
+                this.showTab(e.target.dataset.tab);
+            }
+        });
+    }
+
+    showTab(tabName) {
+        console.log('Switching to tab:', tabName);
+        
+        // Update navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+
+        // Show selected tab content
+        const targetTab = document.getElementById(tabName);
+        if (targetTab) {
+            targetTab.classList.remove('hidden');
+            this.currentTab = tabName;
+
+            // Load tab-specific data
+            this.loadTabData(tabName);
+        }
+    }
+
+    loadTabData(tabName) {
+        console.log('Loading data for tab:', tabName);
+        
+        switch (tabName) {
+            case 'home':
+                this.loadStats();
+                break;
+            case 'foundCatalog':
+                this.loadFoundItems();
+                break;
+            case 'myLostItems':
+                this.loadMyLostItems();
+                break;
+            case 'myClaims':
+                this.loadMyClaims();
+                break;
+            case 'adminClaims':
+                if (auth.isAdmin()) {
+                    this.loadAdminClaims();
+                }
+                break;
+            case 'adminDashboard':
+                if (auth.isAdmin()) {
+                    this.loadAdminDashboard();
+                }
+                break;
+        }
+    }
+
+    loadStats() {
+        const stats = database.getStats();
+        
+        // Update home page stats
+        document.getElementById('lostItemsCount').textContent = stats.totalLostItems;
+        document.getElementById('foundItemsCount').textContent = stats.totalFoundItems;
+        document.getElementById('claimsCount').textContent = stats.pendingClaims;
+
+        // Update admin dashboard stats if visible
+        const adminLostCount = document.getElementById('adminLostCount');
+        const adminFoundCount = document.getElementById('adminFoundCount');
+        const adminClaimsCount = document.getElementById('adminClaimsCount');
+        const adminUsersCount = document.getElementById('adminUsersCount');
+
+        if (adminLostCount) adminLostCount.textContent = stats.totalLostItems;
+        if (adminFoundCount) adminFoundCount.textContent = stats.totalFoundItems;
+        if (adminClaimsCount) adminClaimsCount.textContent = stats.pendingClaims;
+        if (adminUsersCount) adminUsersCount.textContent = stats.totalUsers;
+    }
+
+    async handleLostItemSubmit(e) {
+        e.preventDefault();
+        const user = auth.getCurrentUser();
+        
+        if (!user) {
+            auth.showNotification('Please log in to report lost items', 'error');
+            return;
+        }
+
+        const itemData = {
+            id: database.generateId(),
+            userId: user.id,
+            userName: user.name,
+            itemName: document.getElementById('lostItemName').value,
+            category: document.getElementById('lostCategory').value,
+            description: document.getElementById('lostDescription').value,
+            dateTime: document.getElementById('lostDateTime').value,
+            location: document.getElementById('lostLocation').value,
+            status: 'lost',
+            createdAt: new Date().toISOString()
+        };
+
+        // Handle photo upload
+        const photoFile = document.getElementById('lostPhoto').files[0];
+        if (photoFile) {
+            itemData.photo = await database.saveImage(photoFile);
+        }
+
+        database.saveLostItem(itemData);
+        
+        auth.showNotification('Lost item reported successfully!');
+        e.target.reset();
+        this.hideImagePreview('lostPhotoPreview');
+        this.loadStats();
+        
+        // Switch to My Lost Items tab
+        this.showTab('myLostItems');
+    }
+
+    async handleFoundItemSubmit(e) {
+        e.preventDefault();
+        const user = auth.getCurrentUser();
+        
+        if (!user) {
+            auth.showNotification('Please log in to report found items', 'error');
+            return;
+        }
+
+        const itemData = {
+            id: database.generateId(),
+            foundBy: user.name,
+            foundByUserId: user.id,
+            itemName: document.getElementById('foundItemName').value,
+            category: document.getElementById('foundCategory').value,
+            description: document.getElementById('foundDescription').value,
+            dateTime: document.getElementById('foundDateTime').value,
+            location: document.getElementById('foundLocation').value,
+            status: 'available',
+            createdAt: new Date().toISOString()
+        };
+
+        // Handle photo upload
+        const photoFile = document.getElementById('foundPhoto').files[0];
+        if (photoFile) {
+            itemData.photo = await database.saveImage(photoFile);
+        } else {
+            auth.showNotification('Please upload a photo of the found item', 'error');
+            return;
+        }
+
+        database.saveFoundItem(itemData);
+        
+        auth.showNotification('Found item reported successfully!');
+        e.target.reset();
+        this.hideImagePreview('foundPhotoPreview');
+        this.loadStats();
+    }
+
+    setupFileUpload(inputId, uploadId, previewId, previewImgId) {
+        const fileInput = document.getElementById(inputId);
+        const fileUpload = document.getElementById(uploadId);
+        const preview = document.getElementById(previewId);
+        const previewImg = document.getElementById(previewImgId);
+
+        if (!fileInput || !fileUpload) return;
+
+        fileUpload.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    fileUpload.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    hideImagePreview(previewId) {
+        const preview = document.getElementById(previewId);
+        const uploadId = previewId.replace('Preview', 'Upload');
+        const upload = document.getElementById(uploadId);
+        
+        if (preview) preview.classList.add('hidden');
+        if (upload) upload.classList.remove('hidden');
+    }
+
+    loadFoundItems() {
+        const items = database.getAvailableFoundItems();
+        const grid = document.getElementById('foundItemsGrid');
+        const noItems = document.getElementById('noFoundItems');
+
+        if (!grid) return;
+
+        grid.innerHTML = '';
+
+        if (items.length === 0) {
+            if (noItems) noItems.classList.remove('hidden');
+            return;
+        }
+
+        if (noItems) noItems.classList.add('hidden');
+
+        items.forEach(item => {
+            const itemCard = this.createFoundItemCard(item);
+            grid.appendChild(itemCard);
+        });
+    }
+
+    createFoundItemCard(item) {
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <div class="item-image">
+                ${item.photo ? 
+                    `<img src="${item.photo}" alt="${item.itemName}" />` : 
+                    `<i class="fas fa-box"></i>`
+                }
+            </div>
+            <div class="item-content">
+                <span class="item-category">${item.category}</span>
+                <h3 class="item-name">${item.itemName}</h3>
+                <p class="item-description">${item.description}</p>
+                <div class="item-meta">
+                    <span><i class="fas fa-map-marker-alt"></i> ${item.location}</span>
+                    <span><i class="fas fa-calendar"></i> ${new Date(item.dateTime).toLocaleDateString()}</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-primary btn-sm claim-btn" data-item-id="${item.id}">
+                        <i class="fas fa-hand-holding"></i> Claim Item
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add claim event listener
+        const claimBtn = card.querySelector('.claim-btn');
+        claimBtn.addEventListener('click', () => {
+            this.showClaimModal(item);
+        });
+
+        return card;
+    }
+
+    showClaimModal(item) {
+        this.currentClaimItem = item;
+        const modal = document.getElementById('claimModal');
+        const preview = document.getElementById('claimItemPreview');
+
+        if (preview) {
+            preview.innerHTML = `
+                <h4>${item.itemName}</h4>
+                <p><strong>Category:</strong> ${item.category}</p>
+                <p><strong>Found At:</strong> ${item.location}</p>
+                <p><strong>Description:</strong> ${item.description}</p>
+                ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" style="max-width: 200px; margin-top: 10px;" />` : ''}
+            `;
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    hideClaimModal() {
+        const modal = document.getElementById('claimModal');
+        modal.classList.add('hidden');
+        this.currentClaimItem = null;
+        
+        // Reset claim form
+        const claimForm = document.getElementById('claimForm');
+        if (claimForm) claimForm.reset();
+        this.hideImagePreview('claimProofPreview');
+    }
+
+    async handleClaimSubmit(e) {
+        e.preventDefault();
+        const user = auth.getCurrentUser();
+        
+        if (!user) {
+            auth.showNotification('Please log in to submit a claim', 'error');
+            return;
+        }
+
+        if (!this.currentClaimItem) {
+            auth.showNotification('No item selected for claim', 'error');
+            return;
+        }
+
+        const claimData = {
+            id: database.generateId(),
+            userId: user.id,
+            userName: user.name,
+            itemId: this.currentClaimItem.id,
+            itemName: this.currentClaimItem.itemName,
+            proofDescription: document.getElementById('proofDescription').value,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        };
+
+        // Handle proof photo upload
+        const proofFile = document.getElementById('claimProof').files[0];
+        if (proofFile) {
+            claimData.proofPhoto = await database.saveImage(proofFile);
+        }
+
+        database.saveClaim(claimData);
+        
+        auth.showNotification('Claim submitted successfully! It will be reviewed by an administrator.');
+        this.hideClaimModal();
+        this.loadStats();
+    }
+
+    loadMyLostItems() {
+        const user = auth.getCurrentUser();
+        if (!user) return;
+
+        const items = database.getLostItemsByUser(user.id);
+        const container = document.getElementById('lostItemsList');
+        const noItems = document.getElementById('noLostItems');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (items.length === 0) {
+            if (noItems) noItems.classList.remove('hidden');
+            return;
+        }
+
+        if (noItems) noItems.classList.add('hidden');
+
+        items.forEach(item => {
+            const itemCard = this.createLostItemCard(item);
+            container.appendChild(itemCard);
+        });
+    }
+
+    createLostItemCard(item) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <div class="item-header">
+                <h3>${item.itemName}</h3>
+                <span class="item-category">${item.category}</span>
+            </div>
+            <p>${item.description}</p>
+            <div class="item-meta">
+                <span><i class="fas fa-map-marker-alt"></i> Lost at: ${item.location}</span>
+                <span><i class="fas fa-calendar"></i> ${new Date(item.dateTime).toLocaleString()}</span>
+            </div>
+            <div class="item-status">
+                <span class="status-badge status-pending">Searching</span>
+            </div>
+        `;
+        return card;
+    }
+
+    loadMyClaims() {
+        const user = auth.getCurrentUser();
+        if (!user) return;
+
+        const claims = database.getClaimsByUser(user.id);
+        const container = document.getElementById('claimsList');
+        const noClaims = document.getElementById('noClaims');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (claims.length === 0) {
+            if (noClaims) noClaims.classList.remove('hidden');
+            return;
+        }
+
+        if (noClaims) noClaims.classList.add('hidden');
+
+        claims.forEach(claim => {
+            const claimCard = this.createClaimCard(claim);
+            container.appendChild(claimCard);
+        });
+    }
+
+    createClaimCard(claim) {
+        const statusClass = `status-${claim.status}`;
+        const statusText = claim.status.charAt(0).toUpperCase() + claim.status.slice(1);
+        
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <div class="item-header">
+                <h3>${claim.itemName}</h3>
+                <span class="status-badge ${statusClass}">${statusText}</span>
+            </div>
+            <p><strong>Proof Description:</strong> ${claim.proofDescription}</p>
+            <div class="item-meta">
+                <span><i class="fas fa-calendar"></i> Submitted: ${new Date(claim.createdAt).toLocaleString()}</span>
+            </div>
+            ${claim.proofPhoto ? `<img src="${claim.proofPhoto}" alt="Proof" style="max-width: 200px; margin-top: 10px;" />` : ''}
+        `;
+        return card;
+    }
+
+    filterFoundItems() {
+        const searchTerm = document.getElementById('searchItems').value.toLowerCase();
+        const categoryFilter = document.getElementById('filterCategory').value;
+        
+        const items = database.getAvailableFoundItems();
+        const filteredItems = items.filter(item => {
+            const matchesSearch = item.itemName.toLowerCase().includes(searchTerm) || 
+                                item.description.toLowerCase().includes(searchTerm);
+            const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+            
+            return matchesSearch && matchesCategory;
+        });
+
+        const grid = document.getElementById('foundItemsGrid');
+        const noItems = document.getElementById('noFoundItems');
+
+        if (!grid) return;
+
+        grid.innerHTML = '';
+
+        if (filteredItems.length === 0) {
+            if (noItems) noItems.classList.remove('hidden');
+            return;
+        }
+
+        if (noItems) noItems.classList.add('hidden');
+
+        filteredItems.forEach(item => {
+            const itemCard = this.createFoundItemCard(item);
+            grid.appendChild(itemCard);
+        });
+    }
+
+    loadAdminClaims() {
+        const claims = database.getPendingClaims();
+        const container = document.getElementById('adminClaimsList');
+        const noClaims = document.getElementById('noAdminClaims');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (claims.length === 0) {
+            if (noClaims) noClaims.classList.remove('hidden');
+            return;
+        }
+
+        if (noClaims) noClaims.classList.add('hidden');
+
+        claims.forEach(claim => {
+            const claimCard = this.createAdminClaimCard(claim);
+            container.appendChild(claimCard);
+        });
+    }
+
+    createAdminClaimCard(claim) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <div class="item-header">
+                <h3>${claim.itemName}</h3>
+                <span class="status-badge status-pending">Pending Review</span>
+            </div>
+            <p><strong>Claimant:</strong> ${claim.userName}</p>
+            <p><strong>Proof Description:</strong> ${claim.proofDescription}</p>
+            <div class="item-meta">
+                <span><i class="fas fa-calendar"></i> Submitted: ${new Date(claim.createdAt).toLocaleString()}</span>
+            </div>
+            ${claim.proofPhoto ? `<img src="${claim.proofPhoto}" alt="Proof" style="max-width: 200px; margin-top: 10px;" />` : ''}
+            <div class="item-actions" style="margin-top: 15px;">
+                <button class="btn btn-success btn-sm approve-btn" data-claim-id="${claim.id}">
+                    <i class="fas fa-check"></i> Approve
+                </button>
+                <button class="btn btn-danger btn-sm reject-btn" data-claim-id="${claim.id}">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+            </div>
+        `;
+
+        // Add event listeners for approve/reject buttons
+        const approveBtn = card.querySelector('.approve-btn');
+        const rejectBtn = card.querySelector('.reject-btn');
+
+        approveBtn.addEventListener('click', () => this.handleClaimDecision(claim.id, 'approved'));
+        rejectBtn.addEventListener('click', () => this.handleClaimDecision(claim.id, 'rejected'));
+
+        return card;
+    }
+
+    handleClaimDecision(claimId, decision) {
+        const claim = database.updateClaim(claimId, { status: decision });
+        
+        if (decision === 'approved') {
+            // Update the found item status
+            database.updateFoundItem(claim.itemId, { status: 'claimed' });
+            auth.showNotification('Claim approved successfully!');
+        } else {
+            auth.showNotification('Claim rejected.');
+        }
+
+        // Reload the claims list
+        this.loadAdminClaims();
+        this.loadStats();
+    }
+
+    loadAdminDashboard() {
+        this.loadStats();
+        this.loadRecentActivity();
+    }
+
+    loadRecentActivity() {
+        const activities = database.getRecentActivity(5);
+        const container = document.getElementById('recentActivity');
+
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (activities.length === 0) {
+            container.innerHTML = '<p>No recent activity</p>';
+            return;
+        }
+
+        activities.forEach(activity => {
+            const activityEl = document.createElement('div');
+            activityEl.className = 'activity-item';
+            activityEl.style.padding = '10px';
+            activityEl.style.borderBottom = '1px solid #eee';
+            activityEl.innerHTML = `
+                <p style="margin: 0;">${activity.message}</p>
+                <small style="color: #666;">${new Date(activity.timestamp).toLocaleString()}</small>
+            `;
+            container.appendChild(activityEl);
+        });
+    }
+}
+
+// Initialize the app when DOM is loaded and user is authenticated
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait for auth to be initialized, then initialize app
+    setTimeout(() => {
+        if (auth.getCurrentUser()) {
+            window.app = new LostFoundApp();
+            window.app.init();
+        }
+    }, 100);
+});

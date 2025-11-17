@@ -8,303 +8,419 @@
     <title>Campus Lost & Found System</title>
     <link rel="stylesheet" href="styles/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
+    <!-- Login/Signup Modal -->
+    <div id="authModal" class="modal-overlay">
+        <div class="modal auth-modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="authModalTitle">Login to Lost & Found</h3>
+                <button class="modal-close" id="closeAuthModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-auth="login">Login</button>
+                    <button class="auth-tab" data-auth="signup">Sign Up</button>
+                </div>
+
+                <form id="loginForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="loginEmail">Email *</label>
+                        <input type="email" id="loginEmail" class="form-control" placeholder="your.email@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password *</label>
+                        <input type="password" id="loginPassword" class="form-control" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+
+                <form id="signupForm" class="auth-form hidden">
+                    <div class="form-group">
+                        <label for="signupName">Full Name *</label>
+                        <input type="text" id="signupName" class="form-control" placeholder="Enter your full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupEmail">Email *</label>
+                        <input type="email" id="signupEmail" class="form-control" placeholder="your.email@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">Password *</label>
+                        <input type="password" id="signupPassword" class="form-control" placeholder="Create a password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userRole">I am a *</label>
+                        <select id="userRole" class="form-control" required>
+                            <option value="">Select role</option>
+                            <option value="user">Student/User</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">Create Account</button>
+                </form>
+
+                <div class="auth-footer">
+                    <p id="authSwitchText">Don't have an account? <a href="#" id="authSwitchLink">Sign up here</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App (Hidden until login) -->
+    <div id="app" class="hidden">
+        <!-- Header -->
+        <header>
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <i class="fas fa-box"></i>
+                        <div>
+                            <h1>Lost & Found</h1>
+                            <p>Campus Management System</p>
+                        </div>
+                    </div>
+                    <div class="user-menu">
+                        <span class="user-info" id="userInfo">Welcome, User!</span>
+                        <button class="btn btn-secondary btn-sm" id="logoutBtn">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav>
+            <div class="container">
+                <div class="nav-tabs">
+                    <button class="nav-tab active" data-tab="home">Home</button>
+                    <button class="nav-tab" data-tab="reportLost">Report Lost Item</button>
+                    <button class="nav-tab" data-tab="reportFound">Report Found Item</button>
+                    <button class="nav-tab" data-tab="foundCatalog">Found Items Catalog</button>
+                    <button class="nav-tab" data-tab="myLostItems">My Lost Items</button>
+                    <button class="nav-tab" data-tab="myClaims">My Claims</button>
+                    <button class="nav-tab admin-only hidden" data-tab="adminClaims">Manage Claims</button>
+                    <button class="nav-tab admin-only hidden" data-tab="adminDashboard">Admin Dashboard</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="container">
+            <!-- Home Page -->
+            <section id="home" class="tab-content">
+                <div class="welcome-section card">
+                    <h2>Welcome to Lost & Found</h2>
+                    <p>A streamlined system to help you report lost items and claim found items within the campus.</p>
+                    
+                    <div class="action-cards">
+                        <div class="action-card lost-card" data-tab="reportLost">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <h3>Report Lost Item</h3>
+                            <p>Submit details about items you've lost to help us find them.</p>
+                        </div>
+                        <div class="action-card found-card" data-tab="foundCatalog">
+                            <i class="fas fa-search"></i>
+                            <h3>Claim Found Item</h3>
+                            <p>Browse found items and submit a claim if you see yours.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-number lost-stat" id="lostItemsCount">0</div>
+                            <div class="stat-label">Lost Items Reported</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number found-stat" id="foundItemsCount">0</div>
+                            <div class="stat-label">Found Items Available</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number claims-stat" id="claimsCount">0</div>
+                            <div class="stat-label">Active Claims</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Report Lost Item Form -->
+            <section id="reportLost" class="tab-content hidden">
+                <div class="card form-container">
+                    <h2><i class="fas fa-exclamation-circle"></i> Report Lost Item</h2>
+                    <form id="lostItemForm">
+                        <div class="form-group">
+                            <label for="lostItemName">Item Name *</label>
+                            <input type="text" id="lostItemName" class="form-control" placeholder="e.g., iPhone 13 Pro" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lostCategory">Category *</label>
+                            <select id="lostCategory" class="form-control" required>
+                                <option value="">Select category</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="School Supplies">School Supplies</option>
+                                <option value="Clothing">Clothing</option>
+                                <option value="IDs/Cards">IDs/Cards</option>
+                                <option value="Accessories">Accessories</option>
+                                <option value="Books">Books</option>
+                                <option value="Keys">Keys</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lostDescription">Description *</label>
+                            <textarea id="lostDescription" class="form-control" rows="3" placeholder="Color, brand, distinguishing marks, etc." required></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="lostDateTime">Date & Time Lost *</label>
+                                <input type="datetime-local" id="lostDateTime" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="lostLocation">Location *</label>
+                                <input type="text" id="lostLocation" class="form-control" placeholder="e.g., Library 3rd Floor" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Upload Photo</label>
+                            <div class="file-upload" id="lostPhotoUpload">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Click to upload image</p>
+                                <input type="file" id="lostPhoto" class="file-input" accept="image/*">
+                            </div>
+                            <div id="lostPhotoPreview" class="hidden">
+                                <img id="lostPhotoPreviewImg" class="image-preview">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Submit Lost Item Report</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Report Found Item Form -->
+            <section id="reportFound" class="tab-content hidden">
+                <div class="card form-container">
+                    <h2><i class="fas fa-box"></i> Report Found Item</h2>
+                    <form id="foundItemForm">
+                        <div class="form-group">
+                            <label for="foundItemName">Item Name *</label>
+                            <input type="text" id="foundItemName" class="form-control" placeholder="e.g., Black Wallet" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="foundCategory">Category *</label>
+                            <select id="foundCategory" class="form-control" required>
+                                <option value="">Select category</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="School Supplies">School Supplies</option>
+                                <option value="Clothing">Clothing</option>
+                                <option value="IDs/Cards">IDs/Cards</option>
+                                <option value="Accessories">Accessories</option>
+                                <option value="Books">Books</option>
+                                <option value="Keys">Keys</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="foundDescription">Description *</label>
+                            <textarea id="foundDescription" class="form-control" rows="3" placeholder="Identifiable features, condition, etc." required></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="foundDateTime">Date & Time Found *</label>
+                                <input type="datetime-local" id="foundDateTime" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="foundLocation">Location Found *</label>
+                                <input type="text" id="foundLocation" class="form-control" placeholder="e.g., Cafeteria Table 5" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Upload Photo *</label>
+                            <div class="file-upload" id="foundPhotoUpload">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Click to upload image</p>
+                                <input type="file" id="foundPhoto" class="file-input" accept="image/*" required>
+                            </div>
+                            <div id="foundPhotoPreview" class="hidden">
+                                <img id="foundPhotoPreviewImg" class="image-preview">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success">Submit Found Item Report</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Found Items Catalog -->
+            <section id="foundCatalog" class="tab-content hidden">
+                <div class="card">
+                    <h2>Found Items Catalog</h2>
+                    <div class="search-filter">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchItems" class="form-control" placeholder="Search items...">
+                        </div>
+                        <select id="filterCategory" class="form-control filter-select">
+                            <option value="all">All Categories</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="School Supplies">School Supplies</option>
+                            <option value="Clothing">Clothing</option>
+                            <option value="IDs/Cards">IDs/Cards</option>
+                            <option value="Accessories">Accessories</option>
+                            <option value="Books">Books</option>
+                            <option value="Keys">Keys</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="items-grid" id="foundItemsGrid">
+                    <!-- Found items will be dynamically inserted here -->
+                </div>
+
+                <div id="noFoundItems" class="card empty-state hidden">
                     <i class="fas fa-box"></i>
-                    <div>
-                        <h1>Lost & Found</h1>
-                        <p>Campus Management System</p>
+                    <p>No found items match your search.</p>
+                </div>
+            </section>
+
+            <!-- My Lost Items -->
+            <section id="myLostItems" class="tab-content hidden">
+                <div class="card">
+                    <h2>My Lost Items</h2>
+                    <p>Track the status of your reported lost items</p>
+                </div>
+
+                <div id="lostItemsList">
+                    <!-- Lost items will be dynamically inserted here -->
+                </div>
+
+                <div id="noLostItems" class="card empty-state hidden">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>You haven't reported any lost items yet.</p>
+                    <button class="btn btn-primary" data-tab="reportLost">Report Lost Item</button>
+                </div>
+            </section>
+
+            <!-- My Claims -->
+            <section id="myClaims" class="tab-content hidden">
+                <div class="card">
+                    <h2>My Claim Requests</h2>
+                    <p>Track your submitted claims</p>
+                </div>
+
+                <div id="claimsList">
+                    <!-- Claims will be dynamically inserted here -->
+                </div>
+
+                <div id="noClaims" class="card empty-state hidden">
+                    <i class="fas fa-file-alt"></i>
+                    <p>You haven't submitted any claims yet.</p>
+                    <button class="btn btn-primary" data-tab="foundCatalog">Browse Found Items</button>
+                </div>
+            </section>
+
+            <!-- Admin Claims Management -->
+            <section id="adminClaims" class="tab-content hidden">
+                <div class="card">
+                    <h2>Manage Claim Requests</h2>
+                    <p>Review and verify claim requests</p>
+                </div>
+
+                <div id="adminClaimsList">
+                    <!-- Admin claims will be dynamically inserted here -->
+                </div>
+
+                <div id="noAdminClaims" class="card empty-state hidden">
+                    <i class="fas fa-file-alt"></i>
+                    <p>No claim requests at the moment.</p>
+                </div>
+            </section>
+
+            <!-- Admin Dashboard -->
+            <section id="adminDashboard" class="tab-content hidden">
+                <div class="card">
+                    <h2><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h2>
+                    <p>System overview and management</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card large">
+                        <div class="stat-number lost-stat" id="adminLostCount">0</div>
+                        <div class="stat-label">Total Lost Items</div>
+                    </div>
+                    <div class="stat-card large">
+                        <div class="stat-number found-stat" id="adminFoundCount">0</div>
+                        <div class="stat-label">Total Found Items</div>
+                    </div>
+                    <div class="stat-card large">
+                        <div class="stat-number claims-stat" id="adminClaimsCount">0</div>
+                        <div class="stat-label">Pending Claims</div>
+                    </div>
+                    <div class="stat-card large">
+                        <div class="stat-number user-stat" id="adminUsersCount">0</div>
+                        <div class="stat-label">Registered Users</div>
                     </div>
                 </div>
-                <button class="view-toggle" id="viewToggle">Admin View</button>
+
+                <div class="card">
+                    <h3>Recent Activity</h3>
+                    <div id="recentActivity">
+                        <!-- Recent activity will be inserted here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Claim Modal -->
+        <div id="claimModal" class="modal-overlay hidden">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3 class="modal-title">Claim Item</h3>
+                    <button class="modal-close" id="closeClaimModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="item-preview" id="claimItemPreview">
+                        <!-- Item preview will be dynamically inserted here -->
+                    </div>
+
+                    <form id="claimForm">
+                        <div class="form-group">
+                            <label for="proofDescription">Proof of Ownership *</label>
+                            <textarea id="proofDescription" class="form-control" rows="3" placeholder="Describe hidden details, serial numbers, or other proof that this item belongs to you..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Upload Proof Photo (Optional)</label>
+                            <div class="file-upload" id="claimProofUpload">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Click to upload proof photo</p>
+                                <input type="file" id="claimProof" class="file-input" accept="image/*">
+                            </div>
+                            <div id="claimProofPreview" class="hidden">
+                                <img id="claimProofPreviewImg" class="image-preview">
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="cancelClaim">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Submit Claim Request</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
-    </header>
-
-    <!-- Navigation -->
-    <nav>
-        <div class="container">
-            <div class="nav-tabs">
-                <button class="nav-tab active" data-tab="home">Home</button>
-                <button class="nav-tab" data-tab="reportLost">Report Lost Item</button>
-                <button class="nav-tab" data-tab="reportFound">Report Found Item</button>
-                <button class="nav-tab" data-tab="foundCatalog">Found Items Catalog</button>
-                <button class="nav-tab" data-tab="myLostItems">My Lost Items</button>
-                <button class="nav-tab" data-tab="myClaims">My Claims</button>
-                <button class="nav-tab admin-only hidden" data-tab="adminClaims">Manage Claims</button>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="container">
-        <!-- Home Page -->
-        <section id="home" class="tab-content">
-            <div class="welcome-section card">
-                <h2>Welcome to Lost & Found</h2>
-                <p>A streamlined system to help you report lost items and claim found items within the campus.</p>
-                
-                <div class="action-cards">
-                    <div class="action-card lost-card" data-tab="reportLost">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <h3>Report Lost Item</h3>
-                        <p>Submit details about items you've lost to help us find them.</p>
-                    </div>
-                    <div class="action-card found-card" data-tab="foundCatalog">
-                        <i class="fas fa-search"></i>
-                        <h3>Claim Found Item</h3>
-                        <p>Browse found items and submit a claim if you see yours.</p>
-                    </div>
-                </div>
-                
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-number lost-stat" id="lostItemsCount">0</div>
-                        <div class="stat-label">Lost Items Reported</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number found-stat" id="foundItemsCount">0</div>
-                        <div class="stat-label">Found Items Available</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number claims-stat" id="claimsCount">0</div>
-                        <div class="stat-label">Active Claims</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Report Lost Item Form -->
-        <section id="reportLost" class="tab-content hidden">
-            <div class="card form-container">
-                <h2><i class="fas fa-exclamation-circle"></i> Report Lost Item</h2>
-                <form id="lostItemForm">
-                    <div class="form-group">
-                        <label for="lostItemName">Item Name *</label>
-                        <input type="text" id="lostItemName" class="form-control" placeholder="e.g., iPhone 13 Pro" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="lostCategory">Category *</label>
-                        <select id="lostCategory" class="form-control" required>
-                            <option value="">Select category</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="School Supplies">School Supplies</option>
-                            <option value="Clothing">Clothing</option>
-                            <option value="IDs/Cards">IDs/Cards</option>
-                            <option value="Accessories">Accessories</option>
-                            <option value="Books">Books</option>
-                            <option value="Keys">Keys</option>
-                            <option value="Others">Others</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="lostDescription">Description *</label>
-                        <textarea id="lostDescription" class="form-control" rows="3" placeholder="Color, brand, distinguishing marks, etc." required></textarea>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="lostDateTime">Date & Time Lost *</label>
-                            <input type="datetime-local" id="lostDateTime" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="lostLocation">Location *</label>
-                            <input type="text" id="lostLocation" class="form-control" placeholder="e.g., Library 3rd Floor" required>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Upload Photo</label>
-                        <div class="file-upload" id="lostPhotoUpload">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Click to upload image</p>
-                            <input type="file" id="lostPhoto" class="file-input" accept="image/*">
-                        </div>
-                        <div id="lostPhotoPreview" class="hidden">
-                            <img id="lostPhotoPreviewImg" class="image-preview">
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <h3>Contact Information</h3>
-                        <div class="form-group">
-                            <input type="text" id="lostOwnerName" class="form-control" placeholder="Your Name *" required>
-                        </div>
-                        <div class="form-group">
-                            <input type="email" id="lostContactEmail" class="form-control" placeholder="Email Address *" required>
-                        </div>
-                        <div class="form-group">
-                            <input type="tel" id="lostContactPhone" class="form-control" placeholder="Phone Number *" required>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Submit Lost Item Report</button>
-                </form>
-            </div>
-        </section>
-
-        <!-- Report Found Item Form -->
-        <section id="reportFound" class="tab-content hidden">
-            <div class="card form-container">
-                <h2><i class="fas fa-box"></i> Report Found Item</h2>
-                <form id="foundItemForm">
-                    <div class="form-group">
-                        <label for="foundItemName">Item Name *</label>
-                        <input type="text" id="foundItemName" class="form-control" placeholder="e.g., Black Wallet" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="foundCategory">Category *</label>
-                        <select id="foundCategory" class="form-control" required>
-                            <option value="">Select category</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="School Supplies">School Supplies</option>
-                            <option value="Clothing">Clothing</option>
-                            <option value="IDs/Cards">IDs/Cards</option>
-                            <option value="Accessories">Accessories</option>
-                            <option value="Books">Books</option>
-                            <option value="Keys">Keys</option>
-                            <option value="Others">Others</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="foundDescription">Description *</label>
-                        <textarea id="foundDescription" class="form-control" rows="3" placeholder="Identifiable features, condition, etc." required></textarea>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="foundDateTime">Date & Time Found *</label>
-                            <input type="datetime-local" id="foundDateTime" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="foundLocation">Location Found *</label>
-                            <input type="text" id="foundLocation" class="form-control" placeholder="e.g., Cafeteria Table 5" required>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Upload Photo *</label>
-                        <div class="file-upload" id="foundPhotoUpload">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Click to upload image</p>
-                            <input type="file" id="foundPhoto" class="file-input" accept="image/*" required>
-                        </div>
-                        <div id="foundPhotoPreview" class="hidden">
-                            <img id="foundPhotoPreviewImg" class="image-preview">
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <h3>Finder Information</h3>
-                        <div class="form-group">
-                            <input type="text" id="finderName" class="form-control" placeholder="Your Name *" required>
-                        </div>
-                        <div class="form-group">
-                            <input type="text" id="finderContact" class="form-control" placeholder="Contact Info (Email or Phone) *" required>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-success">Submit Found Item Report</button>
-                </form>
-            </div>
-        </section>
-
-        <!-- Found Items Catalog -->
-        <section id="foundCatalog" class="tab-content hidden">
-            <div class="card">
-                <h2>Found Items Catalog</h2>
-                <div class="search-filter">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="searchItems" class="form-control" placeholder="Search items...">
-                    </div>
-                    <select id="filterCategory" class="form-control filter-select">
-                        <option value="all">All Categories</option>
-                        <option value="Electronics">Electronics</option>
-                        <option value="School Supplies">School Supplies</option>
-                        <option value="Clothing">Clothing</option>
-                        <option value="IDs/Cards">IDs/Cards</option>
-                        <option value="Accessories">Accessories</option>
-                        <option value="Books">Books</option>
-                        <option value="Keys">Keys</option>
-                        <option value="Others">Others</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="items-grid" id="foundItemsGrid">
-                <!-- Found items will be dynamically inserted here -->
-            </div>
-
-            <div id="noFoundItems" class="card empty-state hidden">
-                <i class="fas fa-box"></i>
-                <p>No found items match your search.</p>
-            </div>
-        </section>
-
-        <!-- My Lost Items -->
-        <section id="myLostItems" class="tab-content hidden">
-            <div class="card">
-                <h2>My Lost Items</h2>
-                <p>Track the status of your reported lost items</p>
-            </div>
-
-            <div id="lostItemsList">
-                <!-- Lost items will be dynamically inserted here -->
-            </div>
-
-            <div id="noLostItems" class="card empty-state hidden">
-                <i class="fas fa-exclamation-circle"></i>
-                <p>You haven't reported any lost items yet.</p>
-                <button class="btn btn-primary" data-tab="reportLost">Report Lost Item</button>
-            </div>
-        </section>
-
-        <!-- My Claims -->
-        <section id="myClaims" class="tab-content hidden">
-            <div class="card">
-                <h2>My Claim Requests</h2>
-                <p>Track your submitted claims</p>
-            </div>
-
-            <div id="claimsList">
-                <!-- Claims will be dynamically inserted here -->
-            </div>
-
-            <div id="noClaims" class="card empty-state hidden">
-                <i class="fas fa-file-alt"></i>
-                <p>You haven't submitted any claims yet.</p>
-                <button class="btn btn-primary" data-tab="foundCatalog">Browse Found Items</button>
-            </div>
-        </section>
-
-        <!-- Admin Claims Management -->
-        <section id="adminClaims" class="tab-content hidden">
-            <div class="card">
-                <h2>Manage Claim Requests</h2>
-                <p>Review and verify claim requests</p>
-            </div>
-
-            <div id="adminClaimsList">
-                <!-- Admin claims will be dynamically inserted here -->
-            </div>
-
-            <div id="noAdminClaims" class="card empty-state hidden">
-                <i class="fas fa-file-alt"></i>
-                <p>No claim requests at the moment.</p>
-            </div>
-        </section>
-    </main>
+    </div>
 
     <!-- Notification -->
     <div id="notification" class="notification hidden">
@@ -312,62 +428,8 @@
         <span id="notificationMessage"></span>
     </div>
 
-    <!-- Claim Modal -->
-    <div id="claimModal" class="modal-overlay hidden">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title">Claim Item</h3>
-                <button class="modal-close" id="closeClaimModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="item-preview" id="claimItemPreview">
-                    <!-- Item preview will be dynamically inserted here -->
-                </div>
-
-                <form id="claimForm">
-                    <div class="form-group">
-                        <label for="claimerName">Your Name *</label>
-                        <input type="text" id="claimerName" class="form-control" placeholder="Full name" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="claimerEmail">Email Address *</label>
-                        <input type="email" id="claimerEmail" class="form-control" placeholder="your.email@example.com" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="claimerPhone">Phone Number *</label>
-                        <input type="tel" id="claimerPhone" class="form-control" placeholder="09XX XXX XXXX" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="proofDescription">Proof of Ownership *</label>
-                        <textarea id="proofDescription" class="form-control" rows="3" placeholder="Describe hidden details, serial numbers, or other proof that this item belongs to you..." required></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Upload Proof Photo (Optional)</label>
-                        <div class="file-upload" id="claimProofUpload">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                            <p>Click to upload proof photo</p>
-                            <input type="file" id="claimProof" class="file-input" accept="image/*">
-                        </div>
-                        <div id="claimProofPreview" class="hidden">
-                            <img id="claimProofPreviewImg" class="image-preview">
-                        </div>
-                    </div>
-
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" id="cancelClaim">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Submit Claim Request</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
+    <script src="scripts/database.js"></script>
+    <script src="scripts/auth.js"></script>
     <script src="scripts/app.js"></script>
 </body>
 </html>
