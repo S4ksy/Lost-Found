@@ -34,11 +34,18 @@ class Database {
     }
 
     saveUser(user) {
+    try {
         const users = this.getUsers();
+        console.log('Users before save:', users);
         users.push(user);
         localStorage.setItem(this.usersKey, JSON.stringify(users));
+        console.log('Users after save:', this.getUsers());
         return user;
+    } catch (error) {
+        console.error('Error saving user:', error);
+        throw error;
     }
+}
 
     findUserByEmail(email) {
         const users = this.getUsers();
