@@ -212,9 +212,10 @@ class Auth {
     this.updateUIForUser();
     
     // Initialize the main app
-    initializeApp();
+    setTimeout(() => {
+        initializeMainApp();
+    }, 100);
 }
-
     updateUIForUser() {
         const userInfo = document.getElementById('userInfo');
         const adminElements = document.querySelectorAll('.admin-only');
@@ -270,10 +271,12 @@ class Auth {
     }
 }
 
-function initializeApp() {
-    if (!window.app) {
+function initializeMainApp() {
+    if (typeof LostFoundApp !== 'undefined') {
         window.app = new LostFoundApp();
         window.app.init();
+    } else {
+        console.error('LostFoundApp not found');
     }
 }
 

@@ -5,16 +5,21 @@ class LostFoundApp {
     }
 
     init() {
+        console.log('LostFoundApp initialized');
         this.bindEvents();
         this.loadStats();
         this.showTab('home');
     }
 
     bindEvents() {
+        console.log('Binding events...');
+        
         // Navigation tabs
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
+                e.preventDefault();
                 const tabName = e.target.dataset.tab;
+                console.log('Navigation clicked:', tabName);
                 this.showTab(tabName);
             });
         });
@@ -23,19 +28,28 @@ class LostFoundApp {
         document.querySelectorAll('.action-card').forEach(card => {
             card.addEventListener('click', (e) => {
                 const tabName = e.currentTarget.dataset.tab;
+                console.log('Action card clicked:', tabName);
                 this.showTab(tabName);
             });
         });
 
         // Form submissions
-        document.getElementById('lostItemForm').addEventListener('submit', (e) => this.handleLostItemSubmit(e));
-        document.getElementById('foundItemForm').addEventListener('submit', (e) => this.handleFoundItemSubmit(e));
-        document.getElementById('claimForm').addEventListener('submit', (e) => this.handleClaimSubmit(e));
+        const lostForm = document.getElementById('lostItemForm');
+        const foundForm = document.getElementById('foundItemForm');
+        const claimForm = document.getElementById('claimForm');
+
+        if (lostForm) {
+            lostForm.addEventListener('submit', (e) => this.handleLostItemSubmit(e));
+        }
+        if (foundForm) {
+            foundForm.addEventListener('submit', (e) => this.handleFoundItemSubmit(e));
+        }
+        if (claimForm) {
+            claimForm.addEventListener('submit', (e) => this.handleClaimSubmit(e));
+        }
 
         // File uploads
-        this.setupFileUpload('lostPhoto', 'lostPhotoUpload', 'lostPhotoPreview', 'lostPhotoPreviewImg');
-        this.setupFileUpload('foundPhoto', 'foundPhotoUpload', 'foundPhotoPreview', 'foundPhotoPreviewImg');
-        this.setupFileUpload('claimProof', 'claimProofUpload', 'claimProofPreview', 'claimProofPreviewImg');
+        this.setupFileUploads();
 
         // Search and filter
         const searchInput = document.getElementById('searchItems');
@@ -49,9 +63,17 @@ class LostFoundApp {
         }
 
         // Claim modal
-        document.getElementById('closeClaimModal').addEventListener('click', () => this.hideClaimModal());
-        document.getElementById('cancelClaim').addEventListener('click', () => this.hideClaimModal());
+        const closeClaimModal = document.getElementById('closeClaimModal');
+        const cancelClaim = document.getElementById('cancelClaim');
         
+        if (closeClaimModal) {
+            closeClaimModal.addEventListener('click', () => this.hideClaimModal());
+        }
+        if (cancelClaim) {
+            cancelClaim.addEventListener('click', () => this.hideClaimModal());
+        }
+
+        // Close modal when clicking outside
         const claimModal = document.getElementById('claimModal');
         if (claimModal) {
             claimModal.addEventListener('click', (e) => {
@@ -61,20 +83,57 @@ class LostFoundApp {
             });
         }
 
-        // Empty state buttons
-        document.addEventListener('click', (e) => {
-            if (e.target.dataset.tab) {
-                this.showTab(e.target.dataset.tab);
+        console.log('All events bound successfully');
+    }
+
+    setupFileUploads() {
+        // Lost item photo
+        this.setupFileUpload('lostPhoto', 'lostPhotoUpload', 'lostPhotoPreview', 'lostPhotoPreviewImg');
+        
+        // Found item photo  
+        this.setupFileUpload('foundPhoto', 'foundPhotoUpload', 'foundPhotoPreview', 'foundPhotoPreviewImg');
+        
+        // Claim proof photo
+        this.setupFileUpload('claimProof', 'claimProofUpload', 'claimProofPreview', 'claimProofPreviewImg');
+    }
+
+    setupFileUpload(inputId, uploadId, previewId, previewImgId) {
+        const fileInput = document.getElementById(inputId);
+        const fileUpload = document.getElementById(uploadId);
+        const preview = document.getElementById(previewId);
+        const previewImg = document.getElementById(previewImgId);
+
+        if (!fileInput || !fileUpload) {
+            console.log('File upload elements not found:', inputId);
+            return;
+        }
+
+        fileUpload.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (previewImg) previewImg.src = e.target.result;
+                    if (preview) preview.classList.remove('hidden');
+                    if (fileUpload) fileUpload.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
             }
         });
     }
 
     showTab(tabName) {
-        console.log('Switching to tab:', tabName);
+        console.log('Showing tab:', tabName);
         
         // Update navigation
         document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.tab === tabName);
+            if (tab.dataset.tab === tabName) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
         });
 
         // Hide all tab contents
@@ -90,11 +149,13 @@ class LostFoundApp {
 
             // Load tab-specific data
             this.loadTabData(tabName);
+        } else {
+            console.error('Tab not found:', tabName);
         }
     }
 
     loadTabData(tabName) {
-        console.log('Loading data for tab:', tabName);
+        console.log('Loading data for:', tabName);
         
         switch (tabName) {
             case 'home':
@@ -110,12 +171,12 @@ class LostFoundApp {
                 this.loadMyClaims();
                 break;
             case 'adminClaims':
-                if (auth.isAdmin()) {
+                if (auth && auth.isAdmin()) {
                     this.loadAdminClaims();
                 }
                 break;
             case 'adminDashboard':
-                if (auth.isAdmin()) {
+                if (auth && auth.isAdmin()) {
                     this.loadAdminDashboard();
                 }
                 break;
@@ -123,31 +184,47 @@ class LostFoundApp {
     }
 
     loadStats() {
-        const stats = database.getStats();
-        
-        // Update home page stats
-        document.getElementById('lostItemsCount').textContent = stats.totalLostItems;
-        document.getElementById('foundItemsCount').textContent = stats.totalFoundItems;
-        document.getElementById('claimsCount').textContent = stats.pendingClaims;
+        if (!database) {
+            console.error('Database not available');
+            return;
+        }
 
-        // Update admin dashboard stats if visible
-        const adminLostCount = document.getElementById('adminLostCount');
-        const adminFoundCount = document.getElementById('adminFoundCount');
-        const adminClaimsCount = document.getElementById('adminClaimsCount');
-        const adminUsersCount = document.getElementById('adminUsersCount');
+        try {
+            const stats = database.getStats();
+            
+            // Update home page stats
+            const lostCount = document.getElementById('lostItemsCount');
+            const foundCount = document.getElementById('foundItemsCount');
+            const claimsCount = document.getElementById('claimsCount');
 
-        if (adminLostCount) adminLostCount.textContent = stats.totalLostItems;
-        if (adminFoundCount) adminFoundCount.textContent = stats.totalFoundItems;
-        if (adminClaimsCount) adminClaimsCount.textContent = stats.pendingClaims;
-        if (adminUsersCount) adminUsersCount.textContent = stats.totalUsers;
+            if (lostCount) lostCount.textContent = stats.totalLostItems;
+            if (foundCount) foundCount.textContent = stats.totalFoundItems;
+            if (claimsCount) claimsCount.textContent = stats.pendingClaims;
+
+            console.log('Stats loaded:', stats);
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
     }
 
     async handleLostItemSubmit(e) {
         e.preventDefault();
-        const user = auth.getCurrentUser();
+        console.log('Lost item form submitted');
         
-        if (!user) {
-            auth.showNotification('Please log in to report lost items', 'error');
+        if (!auth || !auth.getCurrentUser()) {
+            this.showNotification('Please log in to report lost items', 'error');
+            return;
+        }
+
+        const user = auth.getCurrentUser();
+        const itemName = document.getElementById('lostItemName');
+        const category = document.getElementById('lostCategory');
+        const description = document.getElementById('lostDescription');
+        const dateTime = document.getElementById('lostDateTime');
+        const location = document.getElementById('lostLocation');
+
+        if (!itemName || !category || !description || !dateTime || !location) {
+            this.showNotification('Please fill in all required fields', 'error');
             return;
         }
 
@@ -155,11 +232,11 @@ class LostFoundApp {
             id: database.generateId(),
             userId: user.id,
             userName: user.name,
-            itemName: document.getElementById('lostItemName').value,
-            category: document.getElementById('lostCategory').value,
-            description: document.getElementById('lostDescription').value,
-            dateTime: document.getElementById('lostDateTime').value,
-            location: document.getElementById('lostLocation').value,
+            itemName: itemName.value,
+            category: category.value,
+            description: description.value,
+            dateTime: dateTime.value,
+            location: location.value,
             status: 'lost',
             createdAt: new Date().toISOString()
         };
@@ -167,12 +244,16 @@ class LostFoundApp {
         // Handle photo upload
         const photoFile = document.getElementById('lostPhoto').files[0];
         if (photoFile) {
-            itemData.photo = await database.saveImage(photoFile);
+            try {
+                itemData.photo = await database.saveImage(photoFile);
+            } catch (error) {
+                console.error('Error uploading image:', error);
+            }
         }
 
         database.saveLostItem(itemData);
         
-        auth.showNotification('Lost item reported successfully!');
+        this.showNotification('Lost item reported successfully!');
         e.target.reset();
         this.hideImagePreview('lostPhotoPreview');
         this.loadStats();
@@ -183,10 +264,22 @@ class LostFoundApp {
 
     async handleFoundItemSubmit(e) {
         e.preventDefault();
-        const user = auth.getCurrentUser();
+        console.log('Found item form submitted');
         
-        if (!user) {
-            auth.showNotification('Please log in to report found items', 'error');
+        if (!auth || !auth.getCurrentUser()) {
+            this.showNotification('Please log in to report found items', 'error');
+            return;
+        }
+
+        const user = auth.getCurrentUser();
+        const itemName = document.getElementById('foundItemName');
+        const category = document.getElementById('foundCategory');
+        const description = document.getElementById('foundDescription');
+        const dateTime = document.getElementById('foundDateTime');
+        const location = document.getElementById('foundLocation');
+
+        if (!itemName || !category || !description || !dateTime || !location) {
+            this.showNotification('Please fill in all required fields', 'error');
             return;
         }
 
@@ -194,11 +287,11 @@ class LostFoundApp {
             id: database.generateId(),
             foundBy: user.name,
             foundByUserId: user.id,
-            itemName: document.getElementById('foundItemName').value,
-            category: document.getElementById('foundCategory').value,
-            description: document.getElementById('foundDescription').value,
-            dateTime: document.getElementById('foundDateTime').value,
-            location: document.getElementById('foundLocation').value,
+            itemName: itemName.value,
+            category: category.value,
+            description: description.value,
+            dateTime: dateTime.value,
+            location: location.value,
             status: 'available',
             createdAt: new Date().toISOString()
         };
@@ -206,42 +299,22 @@ class LostFoundApp {
         // Handle photo upload
         const photoFile = document.getElementById('foundPhoto').files[0];
         if (photoFile) {
-            itemData.photo = await database.saveImage(photoFile);
+            try {
+                itemData.photo = await database.saveImage(photoFile);
+            } catch (error) {
+                console.error('Error uploading image:', error);
+            }
         } else {
-            auth.showNotification('Please upload a photo of the found item', 'error');
+            this.showNotification('Please upload a photo of the found item', 'error');
             return;
         }
 
         database.saveFoundItem(itemData);
         
-        auth.showNotification('Found item reported successfully!');
+        this.showNotification('Found item reported successfully!');
         e.target.reset();
         this.hideImagePreview('foundPhotoPreview');
         this.loadStats();
-    }
-
-    setupFileUpload(inputId, uploadId, previewId, previewImgId) {
-        const fileInput = document.getElementById(inputId);
-        const fileUpload = document.getElementById(uploadId);
-        const preview = document.getElementById(previewId);
-        const previewImg = document.getElementById(previewImgId);
-
-        if (!fileInput || !fileUpload) return;
-
-        fileUpload.addEventListener('click', () => fileInput.click());
-        
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    previewImg.src = e.target.result;
-                    preview.classList.remove('hidden');
-                    fileUpload.classList.add('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
     }
 
     hideImagePreview(previewId) {
@@ -254,11 +327,19 @@ class LostFoundApp {
     }
 
     loadFoundItems() {
+        if (!database) {
+            console.error('Database not available');
+            return;
+        }
+
         const items = database.getAvailableFoundItems();
         const grid = document.getElementById('foundItemsGrid');
         const noItems = document.getElementById('noFoundItems');
 
-        if (!grid) return;
+        if (!grid) {
+            console.error('Found items grid not found');
+            return;
+        }
 
         grid.innerHTML = '';
 
@@ -273,6 +354,8 @@ class LostFoundApp {
             const itemCard = this.createFoundItemCard(item);
             grid.appendChild(itemCard);
         });
+
+        console.log('Found items loaded:', items.length);
     }
 
     createFoundItemCard(item) {
@@ -315,22 +398,27 @@ class LostFoundApp {
         const modal = document.getElementById('claimModal');
         const preview = document.getElementById('claimItemPreview');
 
-        if (preview) {
-            preview.innerHTML = `
-                <h4>${item.itemName}</h4>
-                <p><strong>Category:</strong> ${item.category}</p>
-                <p><strong>Found At:</strong> ${item.location}</p>
-                <p><strong>Description:</strong> ${item.description}</p>
-                ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" style="max-width: 200px; margin-top: 10px;" />` : ''}
-            `;
+        if (!modal || !preview) {
+            console.error('Claim modal elements not found');
+            return;
         }
+
+        preview.innerHTML = `
+            <h4>${item.itemName}</h4>
+            <p><strong>Category:</strong> ${item.category}</p>
+            <p><strong>Found At:</strong> ${item.location}</p>
+            <p><strong>Description:</strong> ${item.description}</p>
+            ${item.photo ? `<img src="${item.photo}" alt="${item.itemName}" style="max-width: 200px; margin-top: 10px;" />` : ''}
+        `;
 
         modal.classList.remove('hidden');
     }
 
     hideClaimModal() {
         const modal = document.getElementById('claimModal');
-        modal.classList.add('hidden');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
         this.currentClaimItem = null;
         
         // Reset claim form
@@ -341,15 +429,23 @@ class LostFoundApp {
 
     async handleClaimSubmit(e) {
         e.preventDefault();
-        const user = auth.getCurrentUser();
+        console.log('Claim form submitted');
         
-        if (!user) {
-            auth.showNotification('Please log in to submit a claim', 'error');
+        if (!auth || !auth.getCurrentUser()) {
+            this.showNotification('Please log in to submit a claim', 'error');
             return;
         }
 
         if (!this.currentClaimItem) {
-            auth.showNotification('No item selected for claim', 'error');
+            this.showNotification('No item selected for claim', 'error');
+            return;
+        }
+
+        const user = auth.getCurrentUser();
+        const proofDescription = document.getElementById('proofDescription');
+
+        if (!proofDescription || !proofDescription.value) {
+            this.showNotification('Please provide proof of ownership', 'error');
             return;
         }
 
@@ -359,7 +455,7 @@ class LostFoundApp {
             userName: user.name,
             itemId: this.currentClaimItem.id,
             itemName: this.currentClaimItem.itemName,
-            proofDescription: document.getElementById('proofDescription').value,
+            proofDescription: proofDescription.value,
             status: 'pending',
             createdAt: new Date().toISOString()
         };
@@ -367,20 +463,26 @@ class LostFoundApp {
         // Handle proof photo upload
         const proofFile = document.getElementById('claimProof').files[0];
         if (proofFile) {
-            claimData.proofPhoto = await database.saveImage(proofFile);
+            try {
+                claimData.proofPhoto = await database.saveImage(proofFile);
+            } catch (error) {
+                console.error('Error uploading proof image:', error);
+            }
         }
 
         database.saveClaim(claimData);
         
-        auth.showNotification('Claim submitted successfully! It will be reviewed by an administrator.');
+        this.showNotification('Claim submitted successfully! It will be reviewed by an administrator.');
         this.hideClaimModal();
         this.loadStats();
     }
 
     loadMyLostItems() {
-        const user = auth.getCurrentUser();
-        if (!user) return;
+        if (!auth || !auth.getCurrentUser() || !database) {
+            return;
+        }
 
+        const user = auth.getCurrentUser();
         const items = database.getLostItemsByUser(user.id);
         const container = document.getElementById('lostItemsList');
         const noItems = document.getElementById('noLostItems');
@@ -406,8 +508,8 @@ class LostFoundApp {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-            <div class="item-header">
-                <h3>${item.itemName}</h3>
+            <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 10px;">
+                <h3 style="margin: 0; flex: 1;">${item.itemName}</h3>
                 <span class="item-category">${item.category}</span>
             </div>
             <p>${item.description}</p>
@@ -415,7 +517,7 @@ class LostFoundApp {
                 <span><i class="fas fa-map-marker-alt"></i> Lost at: ${item.location}</span>
                 <span><i class="fas fa-calendar"></i> ${new Date(item.dateTime).toLocaleString()}</span>
             </div>
-            <div class="item-status">
+            <div class="item-status" style="margin-top: 10px;">
                 <span class="status-badge status-pending">Searching</span>
             </div>
         `;
@@ -423,9 +525,11 @@ class LostFoundApp {
     }
 
     loadMyClaims() {
-        const user = auth.getCurrentUser();
-        if (!user) return;
+        if (!auth || !auth.getCurrentUser() || !database) {
+            return;
+        }
 
+        const user = auth.getCurrentUser();
         const claims = database.getClaimsByUser(user.id);
         const container = document.getElementById('claimsList');
         const noClaims = document.getElementById('noClaims');
@@ -454,8 +558,8 @@ class LostFoundApp {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-            <div class="item-header">
-                <h3>${claim.itemName}</h3>
+            <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 10px;">
+                <h3 style="margin: 0; flex: 1;">${claim.itemName}</h3>
                 <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
             <p><strong>Proof Description:</strong> ${claim.proofDescription}</p>
@@ -468,8 +572,13 @@ class LostFoundApp {
     }
 
     filterFoundItems() {
-        const searchTerm = document.getElementById('searchItems').value.toLowerCase();
-        const categoryFilter = document.getElementById('filterCategory').value;
+        const searchInput = document.getElementById('searchItems');
+        const filterSelect = document.getElementById('filterCategory');
+        
+        if (!searchInput || !filterSelect || !database) return;
+
+        const searchTerm = searchInput.value.toLowerCase();
+        const categoryFilter = filterSelect.value;
         
         const items = database.getAvailableFoundItems();
         const filteredItems = items.filter(item => {
@@ -500,117 +609,34 @@ class LostFoundApp {
         });
     }
 
-    loadAdminClaims() {
-        const claims = database.getPendingClaims();
-        const container = document.getElementById('adminClaimsList');
-        const noClaims = document.getElementById('noAdminClaims');
-
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        if (claims.length === 0) {
-            if (noClaims) noClaims.classList.remove('hidden');
-            return;
-        }
-
-        if (noClaims) noClaims.classList.add('hidden');
-
-        claims.forEach(claim => {
-            const claimCard = this.createAdminClaimCard(claim);
-            container.appendChild(claimCard);
-        });
-    }
-
-    createAdminClaimCard(claim) {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            <div class="item-header">
-                <h3>${claim.itemName}</h3>
-                <span class="status-badge status-pending">Pending Review</span>
-            </div>
-            <p><strong>Claimant:</strong> ${claim.userName}</p>
-            <p><strong>Proof Description:</strong> ${claim.proofDescription}</p>
-            <div class="item-meta">
-                <span><i class="fas fa-calendar"></i> Submitted: ${new Date(claim.createdAt).toLocaleString()}</span>
-            </div>
-            ${claim.proofPhoto ? `<img src="${claim.proofPhoto}" alt="Proof" style="max-width: 200px; margin-top: 10px;" />` : ''}
-            <div class="item-actions" style="margin-top: 15px;">
-                <button class="btn btn-success btn-sm approve-btn" data-claim-id="${claim.id}">
-                    <i class="fas fa-check"></i> Approve
-                </button>
-                <button class="btn btn-danger btn-sm reject-btn" data-claim-id="${claim.id}">
-                    <i class="fas fa-times"></i> Reject
-                </button>
-            </div>
-        `;
-
-        // Add event listeners for approve/reject buttons
-        const approveBtn = card.querySelector('.approve-btn');
-        const rejectBtn = card.querySelector('.reject-btn');
-
-        approveBtn.addEventListener('click', () => this.handleClaimDecision(claim.id, 'approved'));
-        rejectBtn.addEventListener('click', () => this.handleClaimDecision(claim.id, 'rejected'));
-
-        return card;
-    }
-
-    handleClaimDecision(claimId, decision) {
-        const claim = database.updateClaim(claimId, { status: decision });
-        
-        if (decision === 'approved') {
-            // Update the found item status
-            database.updateFoundItem(claim.itemId, { status: 'claimed' });
-            auth.showNotification('Claim approved successfully!');
+    showNotification(message, type = 'success') {
+        // Use auth's notification system if available, otherwise create simple alert
+        if (auth && auth.showNotification) {
+            auth.showNotification(message, type);
         } else {
-            auth.showNotification('Claim rejected.');
+            alert(`${type.toUpperCase()}: ${message}`);
         }
-
-        // Reload the claims list
-        this.loadAdminClaims();
-        this.loadStats();
-    }
-
-    loadAdminDashboard() {
-        this.loadStats();
-        this.loadRecentActivity();
-    }
-
-    loadRecentActivity() {
-        const activities = database.getRecentActivity(5);
-        const container = document.getElementById('recentActivity');
-
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        if (activities.length === 0) {
-            container.innerHTML = '<p>No recent activity</p>';
-            return;
-        }
-
-        activities.forEach(activity => {
-            const activityEl = document.createElement('div');
-            activityEl.className = 'activity-item';
-            activityEl.style.padding = '10px';
-            activityEl.style.borderBottom = '1px solid #eee';
-            activityEl.innerHTML = `
-                <p style="margin: 0;">${activity.message}</p>
-                <small style="color: #666;">${new Date(activity.timestamp).toLocaleString()}</small>
-            `;
-            container.appendChild(activityEl);
-        });
     }
 }
 
-// Initialize the app when DOM is loaded and user is authenticated
-document.addEventListener('DOMContentLoaded', () => {
-    // Wait for auth to be initialized, then initialize app
+// Initialize the app when everything is ready
+function initializeApp() {
+    console.log('Initializing LostFoundApp...');
+    
+    // Wait a bit for auth to initialize
     setTimeout(() => {
-        if (auth.getCurrentUser()) {
+        if (typeof auth !== 'undefined' && auth.getCurrentUser()) {
+            console.log('User is logged in, initializing app...');
             window.app = new LostFoundApp();
             window.app.init();
+        } else {
+            console.log('User not logged in, app will initialize after login');
         }
     }, 100);
+}
+
+// Start initialization when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, starting app initialization...');
+    initializeApp();
 });
