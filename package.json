@@ -4,15 +4,13 @@
   "description": "Campus Lost and Found Management System",
   "main": "index.html",
   "scripts": {
-    "start": "serve -s . -l 3000",
-    "build": "echo 'No build process needed for static site'"
+    "start": "npx serve -s . -l $PORT",
+    "build": "echo 'Building static site' && cp -r . /opt/render/project/src/ || echo 'Build complete'"
   },
   "keywords": ["lost", "found", "campus", "management"],
   "author": "Your Name",
   "license": "MIT",
-  "dependencies": {
-    "serve": "^14.2.0"
-  },
+  "dependencies": {},
   "engines": {
     "node": ">=18"
   }

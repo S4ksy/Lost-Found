@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: lost-found-system
+    env: static
+    buildCommand: ""
+    startCommand: npx serve -s . -l $PORT
+    staticPublishPath: .
