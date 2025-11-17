@@ -1,0 +1,19 @@
+{
+  "name": "lost-and-found-system",
+  "version": "1.0.0",
+  "description": "Campus Lost and Found Management System",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -l 3000",
+    "build": "echo 'No build process needed for static site'"
+  },
+  "keywords": ["lost", "found", "campus", "management"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
